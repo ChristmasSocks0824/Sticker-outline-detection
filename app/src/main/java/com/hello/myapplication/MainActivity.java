@@ -78,6 +78,10 @@ public class MainActivity extends AppCompatActivity {
     private TextView txtAreaValue;
     private int currentNoiseFloor = 300;
 
+    // Target Index 相關
+    private TextView txtTargetIndex;
+    private int selectedTargetIndex = 0;
+
     // 相機控制與縮放偵測
     private Camera camera;
     private ScaleGestureDetector scaleGestureDetector;
@@ -132,6 +136,11 @@ public class MainActivity extends AppCompatActivity {
         Button btnKeyboardInput = findViewById(R.id.btnKeyboardInput);
         btnKeyboardInput.setOnClickListener(v -> showNoiseFloorInputDialog());
 
+        // 初始化 Target Index
+        txtTargetIndex = findViewById(R.id.txtTargetIndex);
+        Button btnTargetInput = findViewById(R.id.btnTargetInput);
+        btnTargetInput.setOnClickListener(v -> showTargetIndexInputDialog());
+
         cameraExecutor = Executors.newSingleThreadExecutor();
         setupZoomGesture();
         checkCameraPermission();
@@ -183,6 +192,34 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Area 已更新", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "超出範圍 (100-10000)", Toast.LENGTH_SHORT).show();
+                }
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "請輸入有效數字", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("取消", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void showTargetIndexInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("輸入要鎖定的物件編號");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(selectedTargetIndex));
+        builder.setView(input);
+
+        builder.setPositiveButton("確定", (dialog, which) -> {
+            String text = input.getText().toString();
+            try {
+                int value = Integer.parseInt(text);
+                if (value >= 0 && value <= 50) {
+                    selectedTargetIndex = value;
+                    txtTargetIndex.setText(String.valueOf(selectedTargetIndex));
+                    Toast.makeText(this, "目標編號已設為: " + selectedTargetIndex, Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "請輸入 0-50 之間的編號", Toast.LENGTH_SHORT).show();
                 }
             } catch (NumberFormatException e) {
                 Toast.makeText(this, "請輸入有效數字", Toast.LENGTH_SHORT).show();
@@ -333,7 +370,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             try {
                 PyObject module = py.getModule("opencv_process");
-                PyObject resultDict = module.callAttr("canny_from_image_bytes", inputImageBytes, selectedMode, currentGamma, currentNoiseFloor);
+                PyObject resultDict = module.callAttr("canny_from_image_bytes", inputImageBytes, selectedMode, currentGamma, currentNoiseFloor, selectedTargetIndex);
                 if (resultDict == null) throw new Exception("Python 回傳空值");
                 PyObject pyStatus = resultDict.callAttr("get", "status");
                 PyObject pyImage = resultDict.callAttr("get", "image");
