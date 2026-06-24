@@ -248,68 +248,56 @@ def canny_from_image_bytes(image_data: bytes, mode: str = "Contour Detection", g
             return result_data
 
         if mode == "Object Recognition":
-            hsv_cnts, _, _ = get_hsv_refined_contours(target_512, gamma_val)
+            # 1. 獲取所有經過 HSV 精煉與面積篩選後的候選輪廓與遮罩
+            hsv_cnts, mask_obj, _ = get_hsv_refined_contours(target_512, gamma_val)
             
+            # --- 情況 A：已手動輸入 Target ID (例如編號 3) ---
             if target_idx > 0 and target_idx <= len(hsv_cnts):
-                template_c = hsv_cnts[target_idx - 1]
-                best_s, best_i = 999.0, -1
+                target_contour = hsv_cnts[target_idx - 1]
                 
-                # 1. 執行匹配運算
-                for i, c in enumerate(hsv_cnts):
-                    score = match_score(template_c, c)
-                    if score < best_s:
-                        best_s, best_i = score, i
+                # a. 建立僅包含目標編號的單一物件遮罩
+                single_mask = np.zeros((BASE_SIZE, BASE_SIZE), dtype=np.uint8)
+                cv2.drawContours(single_mask, [target_contour], -1, 255, thickness=cv2.FILLED)
                 
-                if best_i != -1:
-                    # 【核心構思】：匹配成功後，單獨分離出該輪廓圖案
-                    # a. 建立單一物件的遮罩
-                    single_mask = np.zeros((BASE_SIZE, BASE_SIZE), dtype=np.uint8)
-                    cv2.drawContours(single_mask, [hsv_cnts[best_i]], -1, 255, thickness=cv2.FILLED)
-                    
-                    # b. 產生 target_cleaned (背景全黑，僅保留匹配成功的貼紙像素)
-                    isolated_512 = cv2.bitwise_and(target_512, target_512, mask=single_mask)
-                    
-                    # c. 將影像還原至原始大小
-                    output_matched = cv2.resize(isolated_512, (w_orig, h_orig), interpolation=cv2.INTER_CUBIC)
-                    
-                    # d. 在這張「乾淨」的影像上用綠色線繪製輪廓
-                    matched_rescaled = (hsv_cnts[best_i] * ratio).astype(np.int32)
-                    cv2.drawContours(output_matched, [matched_rescaled], -1, (0, 255, 0), 3)
-                    
-                    # e. 標註編號與面積 (關鍵修正：統一使用 512 尺度下的輪廓計算面積)
-                    # 這樣數據才會與 HSV_findContour 模式完全一致
-                    area_val = cv2.contourArea(hsv_cnts[best_i])
-                    x, y, w, h = cv2.boundingRect(matched_rescaled)
-                    
-                    # 格式改為 (No.1 = 5000 px)，字體縮小 (0.5 * ratio)
-                    label_text = f"(No.{best_i+1} = {int(area_val)} px)"
-                    font_scale = 0.5 * ratio
-                    
-                    # 位置設定在輪廓以外的下方，並保留一些空隙 (y + h + 35*ratio)
-                    text_x = x
-                    text_y = y + h + int(35 * ratio)
-                    
-                    cv2.putText(output_matched, label_text, (text_x, text_y),
-                                cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 0), max(1, int(1.5 * ratio)), cv2.LINE_AA)
-                    
-                    _, buf = cv2.imencode(".png", output_matched)
-                    result_data["image"] = buf.tobytes()
-                    return result_data
+                # b. 提取彩色實體物件樣貌 (背景全黑)
+                isolated_512 = cv2.bitwise_and(target_512, target_512, mask=single_mask)
+                output_matched = cv2.resize(isolated_512, (w_orig, h_orig), interpolation=cv2.INTER_CUBIC)
+                
+                # c. 繪製綠色輪廓
+                rescaled_target = (target_contour * ratio).astype(np.int32)
+                cv2.drawContours(output_matched, [rescaled_target], -1, (0, 255, 0), 3)
+                
+                # d. 標註詳細數據
+                area_val = cv2.contourArea(target_contour)
+                tx, ty, tw, th = cv2.boundingRect(rescaled_target)
+                label = f"(No.{target_idx} = {int(area_val)} px)"
+                cv2.putText(output_matched, label, (tx, ty + th + int(35 * ratio)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5 * ratio, (0, 255, 0), max(1, int(1.5 * ratio)), cv2.LINE_AA)
+                
+                _, buf = cv2.imencode(".png", output_matched)
+                result_data["image"] = buf.tobytes()
+                return result_data
             
-            # --- 若無選定目標或匹配失敗，則顯示所有候選輪廓 (紅色) ---
-            output_all = source_BGR.copy()
+            # --- 情況 B：未輸入 Target ID (預設為 0)，顯示所有通過篩選的輪廓 (黑色背景) ---
+            # a. 產生所有候選物件的彩色淨化影像 (背景全黑)
+            all_isolated_512 = cv2.bitwise_and(target_512, target_512, mask=mask_obj)
+            output_all = cv2.resize(all_isolated_512, (w_orig, h_orig), interpolation=cv2.INTER_CUBIC)
+            
             for idx, c in enumerate(hsv_cnts):
                 rescaled = (c * ratio).astype(np.int32)
-                cv2.drawContours(output_all, [rescaled], -1, (0, 0, 255), 2)
+                # 【修正】：使用綠色 (0, 255, 0) 繪製輪廓線，粗細改為 3
+                cv2.drawContours(output_all, [rescaled], -1, (0, 255, 0), 3)
                 
-                # 同步修改未選定狀態下的字體排版
-                area_all = cv2.contourArea(rescaled)
+                # 計算位置並標註編號
                 rx, ry, rw, rh = cv2.boundingRect(rescaled)
-                label_all = f"(No.{idx+1} = {int(area_all)} px)"
+                label_all = f"No:{idx+1}"
                 
-                # 設定在下方並保留空隙
-                cv2.putText(output_all, label_all, (rx, ry + rh + int(25 * ratio)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4 * ratio, (0, 0, 255), 1, cv2.LINE_AA)
+                # 【修正】：設定在目標輪廓外的正下方位置，與輪廓保留一些間距，文字改為綠色
+                text_x = rx + (rw // 2) - int(10 * ratio) # 略微居中
+                text_y = ry + rh + int(15 * ratio)
+                
+                cv2.putText(output_all, label_all, (text_x, text_y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5 * ratio, (0, 255, 0), 2, cv2.LINE_AA)
 
             _, buf = cv2.imencode(".png", output_all)
             result_data["image"] = buf.tobytes()
