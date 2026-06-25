@@ -1,0 +1,71 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+android {
+    namespace 'com.hello.myapplication'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.hello.myapplication"
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    // ARCore 與 OpenCV SDK 通常包含大量原生代碼，建議開啟
+    buildFeatures {
+        viewBinding true
+    }
+
+}
+
+chaquopy {
+    defaultConfig {
+        version "3.10"
+        pip {
+            install "numpy"
+            install "opencv-python"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+    implementation 'com.google.android.material:material:1.12.0'
+
+    // --- [新增] CameraX 相關依賴 ---
+    def camerax_version = "1.4.0"
+    implementation "androidx.camera:camera-core:${camerax_version}"
+    implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+    implementation "androidx.camera:camera-video:${camerax_version}"
+    implementation "androidx.camera:camera-view:${camerax_version}"
+    implementation "androidx.camera:camera-extensions:${camerax_version}"
+    
+    // OpenCV Android SDK
+    implementation 'org.opencv:opencv:4.10.0'
+
+    // --- [新增] 雙指縮放庫 ---
+    implementation 'com.github.chrisbanes:PhotoView:2.3.0'
+}
