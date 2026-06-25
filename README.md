@@ -89,7 +89,7 @@
 系統在光源穩定、角度垂直的狀態下表現極佳；但將其應用於一般桌面時，演算法容易受到「深色桌面反光」與「淺色桌面陰影」的干擾。未來可能需要針對光影變化加入去雜訊（Denoising）或邊緣強化處理，以提升不同角度下的容錯率。
 
 ## 9. Demo 影片
-* **影片連結：** [點此觀看 Demo 影片 (Google Drive)](https://drive.google.com/file/d/1BM0330jL7TUxu2WEju_qwlkVZVlT_A53/view?usp=drive_link)
+* **影片連結：** [點此觀看 Demo 影片 (Google Drive)](https://drive.google.com/file/d/1mbwSI303-LP4Ld3x7TmK_JKxHwqvQ1gb/view?usp=drive_link)
 * **展示內容說明：** 影片中展示了系統的實際運作畫面，包含成功抓取貼紙輪廓的案例。
 
 ## 10. Team Members
